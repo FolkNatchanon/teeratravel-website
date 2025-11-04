@@ -13,7 +13,7 @@ export default function Navbar() {
         <nav className="bg-white shadow-md fixed top-0 left-0 w-full z-50">
             <div className="max-w-7xl mx-auto px-6 py-4 flex justify-between items-center">
                 {/* Logo */}
-                <Link href="/" className="text-2xl font-bold text-blue-600">
+                <Link href="/" className="text-2xl font-bold text-[#F25912] ]">
                     Teera<span className="text-gray-800">Travel</span>
                 </Link>
 
