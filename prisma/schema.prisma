@@ -10,6 +10,17 @@ generator client {
 }
 
 datasource db {
-  provider = "postgresql"
+  provider = "mysql"
   url      = env("DATABASE_URL")
+}
+
+model User {
+  user_id      Int     @id @default(autoincrement()) // รหัสผู้ใช้ (PK)
+  username     String  @db.VarChar(30)               // ชื่อเข้าใช้
+  user_fname   String  @db.VarChar(30)               // ชื่อจริง
+  user_lname   String  @db.VarChar(30)               // นามสกุล
+  email        String  @db.VarChar(30) @unique       // อีเมล (ไม่ซ้ำ)
+  role         String  @db.Char(1)                   // บทบาท (A=Admin, U=User)
+  password     String  @db.Char(20)                  // รหัสผ่าน
+  phone_number String  @db.Char(10)                  // เบอร์โทร
 }

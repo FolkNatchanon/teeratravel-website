@@ -1,9 +1,13 @@
 import "./globals.css";
-import { Inter } from "next/font/google";
+import { Inter, Noto_Sans_Thai } from "next/font/google";
 import Navbar from "../components/Navbar";
 import Footer from "../components/Footer";
 
 const inter = Inter({ subsets: ["latin"] });
+const notoSansThai = Noto_Sans_Thai({
+  subsets: ['thai', 'latin'],
+  weight: ['100', '200', '300', '400', '500', '700', '800'],
+})
 
 export const metadata = {
   title: "Teera Travel",
@@ -17,9 +21,9 @@ export default function RootLayout({
 }) {
   return (
     <html lang="en">
-      <body className={inter.className}>
+      <body className={notoSansThai.className}>
         <Navbar />
-        <main className="min-h-screen bg-gray-50">{children}</main>
+        <main>{children}</main>
         <Footer />
       </body>
     </html>
