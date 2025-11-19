@@ -9,18 +9,14 @@ export default function Navbar() {
     const toggleMenu = () => setIsOpen((v) => !v);
 
     return (
-        <nav className="bg-blue-100/200 text-gray-700/800 shadow-md fixed top-0 left-0 w-full z-50">
-            <div className="max-w-7xl mx-auto px-6 py-4 flex justify-between items-center">
+        <nav className="justify-center items-center text-gray-700/800 fixed top-0 left-0 w-full h-20 z-50">
+            <div className="max-w-7xl mx-auto px-6 py-4 flex justify-between items-center mt-2">
                 {/* Logo */}
-                <Link href="/" className="text-2xl font-bold text-blue-600">
-                    Teera<span className="text-yellow-500">Travel</span>
-                </Link>
+                <Link href="/" className="text-2xl font-extrabold text-blue-600">Teera<span className="text-yellow-500">Travel</span></Link>
 
                 {/* Desktop Menu */}
                 <div className="hidden md:flex items-center gap-8 font-medium text-gray-700">
                     <Link href="/" className="hover:text-blue-600 transition">หน้าแรก</Link>
-                    <Link href="/tours" className="hover:text-blue-600 transition">แพ็กเกจทัวร์</Link>
-                    <Link href="/booking" className="hover:text-blue-600 transition">จองทัวร์</Link>
                     <Link href="/history" className="hover:text-blue-600 transition">ประวัติการจอง</Link>
                     <Link href="/about" className="hover:text-blue-600 transition">ติดต่อ</Link>
                 </div>

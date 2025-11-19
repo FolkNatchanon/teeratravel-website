@@ -1,12 +1,8 @@
 // This is your Prisma schema file,
 // learn more about it in the docs: https://pris.ly/d/prisma-schema
 
-// Looking for ways to speed up your queries, or scale easily with your serverless or edge functions?
-// Try Prisma Accelerate: https://pris.ly/cli/accelerate-init
-
 generator client {
-  provider = "prisma-client"
-  output   = "../app/generated/prisma"
+  provider = "prisma-client-js"
 }
 
 datasource db {
@@ -14,13 +10,138 @@ datasource db {
   url      = env("DATABASE_URL")
 }
 
+// ---------------- Enums ----------------
+
+enum BookingStatus {
+  pending
+  confirmed
+  cancelled
+}
+
+enum Gender {
+  M
+  F
+  Other
+}
+
+// ประเภทแพ็กเกจ: PRIVATE = เหมาลำ, JOIN = จอยกรุ๊ป
+enum PackageType {
+  PRIVATE   // แพ็กเกจเรือส่วนตัว
+  JOIN      // แพ็กเกจจอยกรุ๊ป
+}
+
+// กลุ่มทริปหลัก ๆ ของ Teera Travel
+enum PackageCategory {
+  FULL_TALU     // Full Trip เกาะทะลุ 3 จุด 4 ชม.
+  SHORT_TALU    // Short Trip เกาะทะลุ 2 จุด 3 ชม.
+  FULL_REMOTE   // Full Trip เกาะล้านเป็ดล้านไก่ 4–5 ชม.
+  JOIN_GROUP    // Join Group ตามรอบ
+}
+
+// เปิด/ปิดการแสดงผลแพ็กเกจ
+enum PackageStatus {
+  active
+  inactive
+}
+
+// ---------------- Models ----------------
+
 model User {
-  user_id      Int     @id @default(autoincrement()) // รหัสผู้ใช้ (PK)
-  username     String  @db.VarChar(30)               // ชื่อเข้าใช้
-  user_fname   String  @db.VarChar(30)               // ชื่อจริง
-  user_lname   String  @db.VarChar(30)               // นามสกุล
-  email        String  @db.VarChar(30) @unique       // อีเมล (ไม่ซ้ำ)
-  role         String  @db.Char(1)                   // บทบาท (A=Admin, U=User)
-  password     String  @db.Char(20)                  // รหัสผ่าน
-  phone_number String  @db.Char(10)                  // เบอร์โทร
+  user_id      Int    @id @default(autoincrement()) // รหัสผู้ใช้ (PK)
+  username     String @db.VarChar(30)               // ชื่อเข้าใช้
+  user_fname   String @db.VarChar(30)               // ชื่อจริง
+  user_lname   String @db.VarChar(30)               // นามสกุล
+  email        String @unique @db.VarChar(30)       // อีเมล (ไม่ซ้ำ)
+  role         String @db.Char(1)                   // บทบาท (A=Admin, U=User)
+  password     String @db.Char(20)                  // รหัสผ่าน
+  phone_number String @db.Char(10)                  // เบอร์โทร
+
+  bookings Booking[]
+}
+
+// ข้อมูลเรือ (ใช้ร่วมกันได้หลายแพ็กเกจ)
+model Boat {
+  boat_id   Int    @id @default(autoincrement())
+  name      String @db.VarChar(80)   // เช่น Teera Travel 1
+  code      String? @db.VarChar(30)  // ถ้ามีรหัสเรือ
+  type      String @db.VarChar(30)   // เช่น "Speedboat"
+  capacity  Int                        // ความจุสูงสุด
+  is_active Boolean @default(true)    // เปิด/ปิดเรือ
+
+  packages Package[]
+}
+
+// แพ็กเกจที่ Admin จะจัดการ และ User จะเห็น
+model Package {
+  package_id  Int     @id @default(autoincrement())
+  name        String  @db.VarChar(120)             // เช่น "Full Trip เกาะทะลุ – Teera 1"
+  description String? @db.Text                     // More Detail / ข้อความยาว
+  price       Decimal @db.Decimal(10, 2)           // ราคาฐาน เช่น 6900฿
+  package_pic String? @db.VarChar(255)             // path รูปภาพแพ็กเกจ
+
+  // จัดกลุ่มตาม business จริงของ Teera Travel
+  type     PackageType     @default(PRIVATE)       // PRIVATE / JOIN
+  category PackageCategory                         // FULL_TALU, SHORT_TALU, FULL_REMOTE, JOIN_GROUP
+  status   PackageStatus   @default(active)        // active / inactive
+
+  // ผูกกับเรือที่ใช้แพ็กเกจนี้ (optional)
+  boat_id Int?
+  boat    Boat? @relation(fields: [boat_id], references: [boat_id])
+
+  // ข้อมูลทริป
+  main_location   String? @db.VarChar(120) // เช่น "เกาะทะลุ"
+  spot_count      Int?                     // จำนวนจุดดำน้ำ
+  duration_minutes Int?                    // นาที เช่น 240 = 4 ชม.
+  max_participants Int?                    // จำนวนคนสูงสุดที่แนะนำ
+
+  // แสดงราคาเป็น "฿ราคา / {base_member_count} Member"
+  base_member_count Int @default(1)        // เช่น 10 สำหรับ Private, 1 สำหรับ Join
+
+  // สำหรับ Private: ราคาต่อคนเพิ่มเติม เช่น ท่านต่อไป 450฿
+  extra_price_per_person Decimal? @db.Decimal(10, 2)
+
+  // bullet list หน้า detail (split ด้วย \n เวลาแสดง)
+  includes_left  String? @db.Text  // สิ่งที่รวมในแพ็กเกจ (น้ำ, อาหาร, อุปกรณ์ ฯลฯ)
+  includes_right String? @db.Text  // รายละเอียดทริป/เงื่อนไข (เวลา, จุดดำน้ำ ฯลฯ)
+
+  // timestamp
+  created_at DateTime @default(now())
+  updated_at DateTime @default(now()) @updatedAt
+
+  bookings Booking[]
+}
+
+model Booking {
+  booking_id Int @id @default(autoincrement())
+  user_id    Int
+  package_id Int
+
+  trip_date   DateTime
+  time_slot   String        @db.VarChar(50)
+  people      Int
+  total_price Decimal       @db.Decimal(10, 2)
+  status      BookingStatus @default(pending)
+  created_at  DateTime      @default(now())
+
+  user       User        @relation(fields: [user_id], references: [user_id])
+  package    Package     @relation(fields: [package_id], references: [package_id])
+  passengers Passenger[]
+
+  @@map("booking") // ตั้งชื่อ table ใน MySQL ว่า booking
+}
+
+model Passenger {
+  passenger_id      Int     @id @default(autoincrement())
+  booking_id        Int
+  fname             String  @db.VarChar(30)
+  lname             String  @db.VarChar(30)
+  age               Int?
+  gender            Gender?
+  food              String? @db.VarChar(100)
+  emergency_contact String? @db.Char(10)
+  note              String? @db.VarChar(100)
+
+  booking Booking @relation(fields: [booking_id], references: [booking_id])
+
+  @@map("passenger") // ตั้งชื่อ table ใน MySQL ว่า passenger
 }

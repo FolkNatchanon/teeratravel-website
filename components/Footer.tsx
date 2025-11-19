@@ -42,7 +42,7 @@ export default function Footer() {
                             <Facebook size={22} />
                         </Link>
                         <Link
-                            href="#"
+                            href="https://www.instagram.com/teeratravel/"
                             className="hover:text-pink-600 transition"
                         >
                             <Instagram size={22} />
