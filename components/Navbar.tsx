@@ -1,48 +1,76 @@
-"use client";
-
-import { useState } from "react";
 import Link from "next/link";
-import { Menu, X } from "lucide-react";
+import { getCurrentUser } from "@/app/lib/getCurrentUser";
 
-export default function Navbar() {
-    const [isOpen, setIsOpen] = useState(false);
-    const toggleMenu = () => setIsOpen((v) => !v);
+export default async function Navbar() {
+    const user = await getCurrentUser();
 
     return (
-        <nav className="justify-center items-center text-gray-700/800 fixed top-0 left-0 w-full h-20 z-50">
-            <div className="max-w-7xl mx-auto px-6 py-4 flex justify-between items-center mt-2">
+        <nav className="fixed top-0 w-full bg-white/90 backdrop-blur-md shadow-sm z-50">
+            <div className="max-w-7xl mx-auto px-6 py-4 flex justify-between items-center">
+
                 {/* Logo */}
-                <Link href="/" className="text-2xl font-extrabold text-blue-600">Teera<span className="text-yellow-500">Travel</span></Link>
-
-                {/* Desktop Menu */}
-                <div className="hidden md:flex items-center gap-8 font-medium text-gray-700">
-                    <Link href="/" className="hover:text-blue-600 transition">หน้าแรก</Link>
-                    <Link href="/history" className="hover:text-blue-600 transition">ประวัติการจอง</Link>
-                    <Link href="/about" className="hover:text-blue-600 transition">ติดต่อ</Link>
-                </div>
-
-                {/* Hamburger */}
-                <button
-                    onClick={toggleMenu}
-                    className="md:hidden text-gray-700 focus:outline-none"
-                    aria-label="Toggle menu"
+                <Link
+                    href="/"
+                    className="text-2xl font-bold text-sky-600 flex items-center gap-1"
                 >
-                    {isOpen ? <X /> : <Menu />}
-                </button>
-            </div>
+                    Teera<span className="text-yellow-500">Travel</span>
+                </Link>
 
-            {/* Mobile Menu */}
-            {isOpen && (
-                <div className="md:hidden bg-white border-t border-gray-200 shadow-sm">
-                    <div className="flex flex-col px-6 py-3 space-y-3 font-medium text-gray-700">
-                        <Link href="/" onClick={toggleMenu} className="hover:text-blue-600 transition">หน้าแรก</Link>
-                        <Link href="/tours" onClick={toggleMenu} className="hover:text-blue-600 transition">แพ็กเกจทัวร์</Link>
-                        <Link href="/booking" onClick={toggleMenu} className="hover:text-blue-600 transition">จองทัวร์</Link>
-                        <Link href="/history" onClick={toggleMenu} className="hover:text-blue-600 transition">ประวัติการจอง</Link>
-                        <Link href="/about" onClick={toggleMenu} className="hover:text-blue-600 transition">ติดต่อ</Link>
+                {/* Right side */}
+                <div className="flex items-center gap-10">
+
+                    {/* เมนูหลัก */}
+                    <div className="flex items-center gap-6 text-slate-700">
+                        <Link href="/" className="hover:text-sky-600 transition">หน้าแรก</Link>
+                        <Link href="/package" className="hover:text-sky-600 transition">แพ็กเกจ</Link>
+                        <Link href="/contact" className="hover:text-sky-600 transition">ติดต่อ</Link>
+
+                        {user && (
+                            <Link href="/history" className="hover:text-sky-600 transition">
+                                ประวัติการจอง
+                            </Link>
+                        )}
                     </div>
+
+                    {/* เส้นคั่น */}
+                    <div className="w-px h-6 bg-slate-300"></div>
+
+                    {/* Login / Register */}
+                    {!user && (
+                        <div className="flex items-center gap-4">
+
+                            <Link href="/login" className="text-slate-700 hover:text-sky-600 transition">
+                                Login
+                            </Link>
+
+                            <Link
+                                href="/register"
+                                className="bg-sky-600 text-white px-4 py-2 rounded-full text-sm hover:bg-sky-700 transition"
+                            >
+                                Register
+                            </Link>
+
+                        </div>
+                    )}
+
+                    {/* User logged in */}
+                    {user && (
+                        <div className="flex items-center gap-4">
+                            <span className="font-medium text-slate-700">👋 {user.username}</span>
+
+                            <form action="/api/auth/logout" method="POST">
+                                <button
+                                    type="submit"
+                                    className="bg-rose-500 text-white px-4 py-2 rounded-full text-sm hover:bg-rose-600 transition"
+                                >
+                                    Logout
+                                </button>
+                            </form>
+                        </div>
+                    )}
+
                 </div>
-            )}
+            </div>
         </nav>
     );
 }
