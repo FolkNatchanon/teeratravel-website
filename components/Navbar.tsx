@@ -23,13 +23,12 @@ export default async function Navbar() {
                     <div className="flex items-center gap-6 text-slate-700">
                         <Link href="/" className="hover:text-sky-600 transition">หน้าแรก</Link>
                         <Link href="/package" className="hover:text-sky-600 transition">แพ็กเกจ</Link>
-                        <Link href="/contact" className="hover:text-sky-600 transition">ติดต่อ</Link>
-
                         {user && (
                             <Link href="/history" className="hover:text-sky-600 transition">
                                 ประวัติการจอง
                             </Link>
                         )}
+                        <Link href="/contact" className="hover:text-sky-600 transition">ติดต่อ</Link>
                     </div>
 
                     {/* เส้นคั่น */}
@@ -56,7 +55,7 @@ export default async function Navbar() {
                     {/* User logged in */}
                     {user && (
                         <div className="flex items-center gap-4">
-                            <span className="font-medium text-slate-700">👋 {user.username}</span>
+                            <span className="font-bold text-slate-700 "> {user.username}</span>
 
                             <form action="/api/auth/logout" method="POST">
                                 <button

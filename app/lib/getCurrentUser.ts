@@ -1,3 +1,4 @@
+// app/lib/getCurrentUser.ts
 import { cookies } from "next/headers";
 
 export async function getCurrentUser() {
