@@ -3,6 +3,7 @@ import SectionTitle from "../../components/SectionTitle";
 import TourCard from "../../components/TourCard";
 import { getAllActivePackages } from "../lib/services/packageService";
 import type { PackageCardData } from "../types/package";
+export const dynamic = "force-dynamic";
 
 // แปลงนาทีเป็น "x ชั่วโมง"
 function formatDuration(minutes: number | null): string {

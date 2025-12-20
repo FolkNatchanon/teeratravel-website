@@ -1,6 +1,5 @@
 import { NextResponse } from "next/server";
 import { prisma } from "@/app/lib/prisma";
-import { cookies } from "next/headers";
 
 export async function POST(request: Request) {
     try {
@@ -17,10 +16,7 @@ export async function POST(request: Request) {
         // หา user จาก email หรือ username
         const user = await prisma.user.findFirst({
             where: {
-                OR: [
-                    { email: identifier },
-                    { username: identifier },
-                ],
+                OR: [{ email: identifier }, { username: identifier }],
             },
         });
 
@@ -31,15 +27,34 @@ export async function POST(request: Request) {
             );
         }
 
-        // สร้าง cookie
+        // สร้าง cookie (เก็บเฉพาะข้อมูลที่ต้องใช้ฝั่ง server / middleware)
         const payload = JSON.stringify({
             user_id: user.user_id,
             username: user.username,
-            role: user.role,
+            user_fname: user.user_fname,
+            user_lname: user.user_lname,
+            email: user.email,
+            role: user.role, // 'A' | 'U'
         });
 
-        const cookieStore = await cookies();
-        cookieStore.set("teera_user", payload, {
+        // สำคัญ: ไม่ redirect ใน API
+        // ให้ client เป็นคนตัดสินใจว่า role ไหนควรไปหน้าไหน
+        const res = NextResponse.json(
+            {
+                ok: true,
+                role: user.role,
+                user: {
+                    user_id: user.user_id,
+                    username: user.username,
+                    user_fname: user.user_fname,
+                    user_lname: user.user_lname,
+                    email: user.email,
+                },
+            },
+            { status: 200 }
+        );
+
+        res.cookies.set("teera_user", payload, {
             httpOnly: true,
             sameSite: "lax",
             secure: process.env.NODE_ENV === "production",
@@ -47,13 +62,9 @@ export async function POST(request: Request) {
             maxAge: 60 * 60 * 24 * 7,
         });
 
-        return NextResponse.redirect(new URL("/", request.url));
-
+        return res;
     } catch (error) {
         console.error("Login error:", error);
-        return NextResponse.json(
-            { message: "เกิดข้อผิดพลาดในระบบ" },
-            { status: 500 }
-        );
+        return NextResponse.json({ message: "เกิดข้อผิดพลาดในระบบ" }, { status: 500 });
     }
 }
