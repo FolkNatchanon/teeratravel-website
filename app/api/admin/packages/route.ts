@@ -1,79 +1,74 @@
 import { NextResponse } from "next/server";
-import { prisma } from "@/app/lib/prisma";
-import { requireAdmin } from "@/app/lib/getCurrentUser";
-import { revalidatePath } from "next/cache";
+import { requireAdmin } from "@/app/lib/auth/currentUser";
+import { adminCreatePackage, adminListPackages } from "@/app/lib/services/package/package.service";
 
 export const runtime = "nodejs";
 
+export async function GET() {
+    try {
+        await requireAdmin();
+        const packages = await adminListPackages();
+        return NextResponse.json({ ok: true, packages });
+    } catch (err) {
+        console.error("GET /api/admin/packages error:", err);
+        return NextResponse.json({ message: "Unauthorized" }, { status: 401 });
+    }
+}
+
 export async function POST(req: Request) {
     try {
-        const admin = await requireAdmin();
-        if (!admin) {
-            return NextResponse.json({ message: "Unauthorized" }, { status: 401 });
-        }
+        await requireAdmin();
 
-        const body = await req.json();
+        const body = await req.json().catch(() => null);
 
-        // ฟิลด์ตาม schema.prisma ของคุณ
-        const {
+        const name = body?.name?.toString()?.trim();
+        const description = body?.description?.toString()?.trim() || null;
+
+        const price = Number(body?.price);
+        const boat_id = body?.boat_id ? Number(body.boat_id) : null;
+
+        const type = body?.type === "JOIN" ? "JOIN" : "PRIVATE";
+        const time_slot = body?.time_slot === "AFTERNOON" ? "AFTERNOON" : "MORNING";
+
+        const time = body?.time === "" || body?.time == null ? null : Number(body?.time);
+        const spot_count =
+            body?.spot_count === "" || body?.spot_count == null ? null : Number(body?.spot_count);
+
+        const extra_price_per_person =
+            body?.extra_price_per_person === "" || body?.extra_price_per_person == null
+                ? null
+                : Number(body?.extra_price_per_person);
+
+        const status = body?.status === "active" ? "active" : "inactive";
+
+        if (!name) return NextResponse.json({ message: "กรุณากรอกชื่อแพ็กเกจ" }, { status: 400 });
+        if (!Number.isFinite(price) || price <= 0)
+            return NextResponse.json({ message: "price ต้องเป็นตัวเลขมากกว่า 0" }, { status: 400 });
+
+        if (time !== null && (!Number.isFinite(time) || time <= 0))
+            return NextResponse.json({ message: "time ต้องเป็นตัวเลขมากกว่า 0" }, { status: 400 });
+
+        if (spot_count !== null && (!Number.isFinite(spot_count) || spot_count < 0))
+            return NextResponse.json({ message: "spot_count ไม่ถูกต้อง" }, { status: 400 });
+
+        if (
+            extra_price_per_person !== null &&
+            (!Number.isFinite(extra_price_per_person) || extra_price_per_person < 0)
+        )
+            return NextResponse.json({ message: "extra_price_per_person ไม่ถูกต้อง" }, { status: 400 });
+
+        const created = await adminCreatePackage({
             name,
             description,
             price,
-            package_pic,
-            type,
-            category,
-            status, // "active" | "inactive"
             boat_id,
-            main_location,
+            type,
+            time_slot,
+            time,
             spot_count,
-            duration_minutes,
-            max_participants,
-            base_member_count,
             extra_price_per_person,
-            includes_left,
-            includes_right,
-        } = body;
-
-        if (!name || !price || !category) {
-            return NextResponse.json(
-                { message: "กรุณากรอก Name, Price และ Category" },
-                { status: 400 }
-            );
-        }
-
-        const created = await prisma.package.create({
-            data: {
-                name: String(name),
-                description: description ? String(description) : null,
-                price: String(price), // Prisma Decimal รับ string ได้
-                package_pic: package_pic ? String(package_pic) : null,
-
-                type: type ?? "PRIVATE",
-                category,
-                status: status ?? "inactive", // แนะนำ default เป็น inactive ใน admin
-
-                boat_id: boat_id ? Number(boat_id) : null,
-
-                main_location: main_location ? String(main_location) : null,
-                spot_count: spot_count !== undefined && spot_count !== null ? Number(spot_count) : null,
-                duration_minutes:
-                    duration_minutes !== undefined && duration_minutes !== null ? Number(duration_minutes) : null,
-                max_participants:
-                    max_participants !== undefined && max_participants !== null ? Number(max_participants) : null,
-
-                base_member_count: base_member_count ? Number(base_member_count) : 1,
-                extra_price_per_person:
-                    extra_price_per_person !== undefined && extra_price_per_person !== null
-                        ? String(extra_price_per_person)
-                        : null,
-
-                includes_left: includes_left ? String(includes_left) : null,
-                includes_right: includes_right ? String(includes_right) : null,
-            },
+            status,
         });
-
-        // ให้หน้า user เห็นผล (กันเคสโดน cache/ISR)
-        revalidatePath("/package");
 
         return NextResponse.json({ ok: true, package: created }, { status: 201 });
     } catch (err) {

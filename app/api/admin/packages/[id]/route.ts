@@ -1,138 +1,67 @@
+// app/api/admin/packages/[id]/route.ts
 import { NextResponse } from "next/server";
-import { prisma } from "@/app/lib/prisma";
-import { getCurrentUser } from "@/app/lib/getCurrentUser";
-import { revalidatePath } from "next/cache";
+import { requireAdmin } from "@/app/lib/auth/currentUser";
+import {
+    adminGetPackageById,
+    adminUpdatePackage,
+} from "@/app/lib/services/package/package.service";
+import { toNumberOrNull, toStringOrNull } from "@/app/lib/services/package/package.dto";
 
 export const runtime = "nodejs";
 
-function getIdFromUrl(req: Request) {
-    const pathname = new URL(req.url).pathname; // /api/admin/packages/{id}
-    const parts = pathname.split("/").filter(Boolean);
-    const idx = parts.indexOf("packages");
-    const idStr = idx >= 0 ? parts[idx + 1] : null;
-    return idStr ?? null;
-}
-
-function toNumberOrNull(v: any) {
-    if (v === "" || v === undefined || v === null) return null;
-    const n = Number(v);
-    return Number.isFinite(n) ? n : null;
-}
-
-function toStringOrNull(v: any) {
-    if (v === "" || v === undefined || v === null) return null;
-    return String(v);
-}
-
-// GET: เอาข้อมูลเดิมไปเติมในฟอร์ม
-export async function GET(req: Request, ctx: { params?: { id?: string } }) {
+export async function GET(_: Request, ctx: { params: { id: string } }) {
     try {
-        const user = await getCurrentUser();
-        if (!user || user.role !== "A") {
-            return NextResponse.json({ message: "Unauthorized" }, { status: 401 });
-        }
+        await requireAdmin();
+        const id = Number(ctx.params.id);
+        if (!Number.isFinite(id)) return NextResponse.json({ message: "Invalid id" }, { status: 400 });
 
-        const idStr = ctx?.params?.id ?? getIdFromUrl(req);
-        const packageId = Number(idStr);
-        if (!Number.isFinite(packageId)) {
-            return NextResponse.json({ message: "Invalid package id" }, { status: 400 });
-        }
+        const pkg = await adminGetPackageById(id);
+        if (!pkg) return NextResponse.json({ message: "Not found" }, { status: 404 });
 
-        const pkg = await prisma.package.findUnique({
-            where: { package_id: packageId },
-        });
-
-        if (!pkg) {
-            return NextResponse.json({ message: "Package not found" }, { status: 404 });
-        }
-
-        return NextResponse.json({ ok: true, package: pkg }, { status: 200 });
-    } catch (err) {
-        console.error("GET /api/admin/packages/[id] error:", err);
-        return NextResponse.json({ message: "Server error" }, { status: 500 });
+        return NextResponse.json({ data: pkg });
+    } catch {
+        return NextResponse.json({ message: "FORBIDDEN" }, { status: 403 });
     }
 }
 
-// PATCH: อัปเดต package
-export async function PATCH(req: Request, ctx: { params?: { id?: string } }) {
+export async function PATCH(req: Request, ctx: { params: { id: string } }) {
     try {
-        const user = await getCurrentUser();
-        if (!user || user.role !== "A") {
-            return NextResponse.json({ message: "Unauthorized" }, { status: 401 });
-        }
+        await requireAdmin();
 
-        const idStr = ctx?.params?.id ?? getIdFromUrl(req);
-        const packageId = Number(idStr);
-        if (!Number.isFinite(packageId)) {
-            return NextResponse.json({ message: "Invalid package id" }, { status: 400 });
-        }
+        const id = Number(ctx.params.id);
+        if (!Number.isFinite(id)) return NextResponse.json({ message: "Invalid id" }, { status: 400 });
 
-        const body = await req.json().catch(() => ({}));
+        const body = await req.json();
 
-        // ปรับ field ตาม schema ของนาย (ตัวที่ใช้แน่ ๆ)
-        const {
-            name,
-            description,
-            price,        // Decimal -> ส่งเป็น string/number ก็ได้ แต่เราแปลงเป็น string ให้ชัวร์
-            package_pic,
-            type,         // "PRIVATE" | "JOIN"
-            category,     // enum category
-            status,       // "active" | "inactive"
-            boat_id,
-            main_location,
-            spot_count,
-            duration_minutes,
-            max_participants,
-            base_member_count,
-            extra_price_per_person,
-            includes_left,
-            includes_right,
-        } = body;
+        const updated = await adminUpdatePackage(id, {
+            ...(body?.name !== undefined ? { name: String(body.name) } : {}),
+            ...(body?.description !== undefined ? { description: toStringOrNull(body.description) } : {}),
+            ...(body?.price !== undefined ? { price: String(body.price) } : {}),
+            ...(body?.package_pic !== undefined ? { package_pic: toStringOrNull(body.package_pic) } : {}),
 
-        // validate เบา ๆ
-        if (!name || String(name).trim() === "") {
-            return NextResponse.json({ message: "Name is required" }, { status: 400 });
-        }
-        if (price === undefined || price === null || String(price).trim() === "") {
-            return NextResponse.json({ message: "Price is required" }, { status: 400 });
-        }
+            ...(body?.type !== undefined ? { type: body.type } : {}),
+            ...(body?.category !== undefined ? { category: body.category } : {}),
+            ...(body?.status !== undefined ? { status: body.status } : {}),
 
-        const updated = await prisma.package.update({
-            where: { package_id: packageId },
-            data: {
-                name: String(name),
-                description: toStringOrNull(description),
-                price: String(price),
-                package_pic: toStringOrNull(package_pic),
+            ...(body?.boat_id !== undefined ? { boat_id: toNumberOrNull(body.boat_id) } : {}),
 
-                type: type ?? undefined,
-                category: category ?? undefined,
-                status: status ?? undefined,
+            ...(body?.main_location !== undefined ? { main_location: toStringOrNull(body.main_location) } : {}),
+            ...(body?.spot_count !== undefined ? { spot_count: toNumberOrNull(body.spot_count) } : {}),
+            ...(body?.duration_minutes !== undefined ? { duration_minutes: toNumberOrNull(body.duration_minutes) } : {}),
+            ...(body?.max_participants !== undefined ? { max_participants: toNumberOrNull(body.max_participants) } : {}),
 
-                boat_id: toNumberOrNull(boat_id),
-                main_location: toStringOrNull(main_location),
-                spot_count: toNumberOrNull(spot_count),
-                duration_minutes: toNumberOrNull(duration_minutes),
-                max_participants: toNumberOrNull(max_participants),
-                base_member_count: base_member_count ? Number(base_member_count) : undefined,
-                extra_price_per_person:
-                    extra_price_per_person === "" || extra_price_per_person === undefined || extra_price_per_person === null
-                        ? null
-                        : String(extra_price_per_person),
+            ...(body?.base_member_count !== undefined ? { base_member_count: Number(body.base_member_count) } : {}),
+            ...(body?.extra_price_per_person !== undefined
+                ? { extra_price_per_person: toStringOrNull(body.extra_price_per_person) }
+                : {}),
 
-                includes_left: toStringOrNull(includes_left),
-                includes_right: toStringOrNull(includes_right),
-            },
-            select: { package_id: true, status: true, name: true },
+            ...(body?.includes_left !== undefined ? { includes_left: toStringOrNull(body.includes_left) } : {}),
+            ...(body?.includes_right !== undefined ? { includes_right: toStringOrNull(body.includes_right) } : {}),
         });
 
-        // ให้ทั้ง admin list และ user page เห็นผลทันที
-        revalidatePath("/admin/packages");
-        revalidatePath("/package");
-
-        return NextResponse.json({ ok: true, updated }, { status: 200 });
-    } catch (err) {
-        console.error("PATCH /api/admin/packages/[id] error:", err);
-        return NextResponse.json({ message: "Server error" }, { status: 500 });
+        return NextResponse.json({ data: updated });
+    } catch (e: any) {
+        const msg = typeof e?.message === "string" ? e.message : "BAD_REQUEST";
+        return NextResponse.json({ message: msg }, { status: msg === "FORBIDDEN" ? 403 : 400 });
     }
 }

@@ -1,37 +1,19 @@
 // app/api/packages/[id]/route.ts
-import { NextRequest, NextResponse } from "next/server";
-import { prisma } from "@/app/lib/prisma";
+import { NextResponse } from "next/server";
+import { getActivePackageById } from "@/app/lib/services/package/package.service";
 
-export async function GET(
-    req: NextRequest,
-    { params }: { params: { id: string } }
-) {
-    const packageId = Number(params.id);
+export const runtime = "nodejs";
 
-    if (!packageId) {
-        return NextResponse.json(
-            { error: "Invalid package id" },
-            { status: 400 }
-        );
+export async function GET(_: Request, ctx: { params: { id: string } }) {
+    const id = Number(ctx.params.id);
+    if (!Number.isFinite(id)) {
+        return NextResponse.json({ message: "Invalid id" }, { status: 400 });
     }
 
-    const pkg = await prisma.package.findUnique({
-        where: { package_id: packageId },
-        select: {
-            package_id: true,
-            name: true,
-            price: true,
-            base_member_count: true,
-            extra_price_per_person: true,
-        },
-    });
-
+    const pkg = await getActivePackageById(id);
     if (!pkg) {
-        return NextResponse.json(
-            { error: "Package not found" },
-            { status: 404 }
-        );
+        return NextResponse.json({ message: "Not found" }, { status: 404 });
     }
 
-    return NextResponse.json(pkg);
+    return NextResponse.json({ data: pkg });
 }

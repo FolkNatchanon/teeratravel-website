@@ -1,10 +1,13 @@
 import { NextResponse } from "next/server";
 import { prisma } from "@/app/lib/prisma";
 
+export const runtime = "nodejs";
+
 export async function POST(request: Request) {
     try {
-        const body = await request.json();
-        const { identifier, password } = body;
+        const body = await request.json().catch(() => null);
+        const identifier = body?.identifier?.toString()?.trim();
+        const password = body?.password?.toString();
 
         if (!identifier || !password) {
             return NextResponse.json(
@@ -13,13 +16,23 @@ export async function POST(request: Request) {
             );
         }
 
-        // หา user จาก email หรือ username
         const user = await prisma.user.findFirst({
             where: {
                 OR: [{ email: identifier }, { username: identifier }],
             },
+            select: {
+                user_id: true,
+                username: true,
+                email: true,
+                role: true,
+                password: true,
+                user_fname: true,
+                user_lname: true,
+            },
         });
 
+        // NOTE: ตอนนี้ยังเทียบ plain-text ตามโค้ดเดิม
+        // ถ้าใน DB เป็น hash ต้องเปลี่ยนมาใช้ bcrypt.compare
         if (!user || user.password !== password) {
             return NextResponse.json(
                 { message: "ข้อมูลเข้าสู่ระบบไม่ถูกต้อง" },
@@ -27,18 +40,12 @@ export async function POST(request: Request) {
             );
         }
 
-        // สร้าง cookie (เก็บเฉพาะข้อมูลที่ต้องใช้ฝั่ง server / middleware)
         const payload = JSON.stringify({
             user_id: user.user_id,
             username: user.username,
-            user_fname: user.user_fname,
-            user_lname: user.user_lname,
-            email: user.email,
-            role: user.role, // 'A' | 'U'
+            role: user.role, // "A" | "U"
         });
 
-        // สำคัญ: ไม่ redirect ใน API
-        // ให้ client เป็นคนตัดสินใจว่า role ไหนควรไปหน้าไหน
         const res = NextResponse.json(
             {
                 ok: true,
@@ -46,9 +53,9 @@ export async function POST(request: Request) {
                 user: {
                     user_id: user.user_id,
                     username: user.username,
+                    email: user.email,
                     user_fname: user.user_fname,
                     user_lname: user.user_lname,
-                    email: user.email,
                 },
             },
             { status: 200 }

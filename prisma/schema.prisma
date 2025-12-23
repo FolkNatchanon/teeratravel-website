@@ -1,5 +1,4 @@
 // ---------------- Generator & DB ----------------
-
 generator client {
   provider = "prisma-client-js"
 }
@@ -9,31 +8,22 @@ datasource db {
   url      = env("DATABASE_URL")
 }
 
-
 // ---------------- Enums ----------------
-
 enum BookingStatus {
   pending
-  confirmed
-  cancelled
+  complete
+  cancel
 }
 
 enum Gender {
-  M
-  F
-  Other
+  male
+  female
+  other
 }
 
 enum PackageType {
-  PRIVATE
-  JOIN
-}
-
-enum PackageCategory {
-  FULL_TALU
-  SHORT_TALU
-  FULL_REMOTE
-  JOIN_GROUP
+  private
+  join
 }
 
 enum PackageStatus {
@@ -41,168 +31,150 @@ enum PackageStatus {
   inactive
 }
 
-enum JoinTripStatus {
-  draft
-  open
-  closed
-  cancelled
+enum TimeSlot {
+  morning
+  afternoon
 }
 
+enum TimeSlotStatus {
+  active
+  inactive
+}
 
 // ---------------- Models ----------------
 
 // ----------- USER ----------------
-
 model User {
-  user_id      Int    @id @default(autoincrement())
+  user_id      Int     @id @default(autoincrement())
   username     String  @db.VarChar(30)
   user_fname   String  @db.VarChar(30)
   user_lname   String  @db.VarChar(30)
   email        String  @unique @db.VarChar(50)
-  role         String  @db.Char(1)
+  role         String  @db.Char(1)        // "A" | "U" (ตาม cookie teera_user)
   password     String  @db.VarChar(100)
   phone_number String  @db.Char(10)
 
   bookings     Booking[]
+
+  @@index([role])
 }
-
-
 
 // ----------- BOAT ----------------
-
 model Boat {
-  boat_id               Int        @id @default(autoincrement())
-  name                  String     @db.VarChar(80)
-  code                  String?    @db.VarChar(30)
-  type                  String     @db.VarChar(30)
-  capacity              Int
-  extra_private_price   Decimal    @default(0) @db.Decimal(10, 2)
-  is_active             Boolean    @default(true)
+  boat_id    Int      @id @default(autoincrement())
+  name       String   @db.VarChar(80)
+  capacity   Int
+  is_active  Boolean  @default(true)
 
-  // relations
-  bookings              Booking[]
-  joinTrips             JoinTrip[]
-  packages              Package[]
+  packages   Package[]
 
-  created_at            DateTime   @default(now())
-  updated_at            DateTime   @default(now()) @updatedAt
+  created_at DateTime @default(now())
+  updated_at DateTime @default(now()) @updatedAt
+
+  @@index([is_active])
 }
-
-
 
 // ----------- PACKAGE ----------------
-
 model Package {
-  package_id             Int               @id @default(autoincrement())
-  name                   String            @db.VarChar(120)
-  description            String?           @db.Text
-  price                  Decimal           @db.Decimal(10, 2)
-  package_pic            String?           @db.VarChar(255)
+  package_id             Int           @id @default(autoincrement())
+  name                   String        @db.VarChar(120)
+  description            String?       @db.Text
+  price                  Decimal       @db.Decimal(10, 2)
 
-  type                   PackageType       @default(PRIVATE)
-  category               PackageCategory
-  status                 PackageStatus     @default(active)
-
-  // optional main boat
   boat_id                Int?
-  boat                   Boat?             @relation(fields: [boat_id], references: [boat_id])
+  boat                   Boat?         @relation(fields: [boat_id], references: [boat_id])
 
-  // trip info
-  main_location          String?           @db.VarChar(120)
+  type                   PackageType   @default(private)
+
+  time                   Int?          // เวลาประมาณของทริป (นาที) เช่น 240
   spot_count             Int?
-  duration_minutes       Int?
-  max_participants       Int?
 
-  // pricing
-  base_member_count      Int               @default(1)
-  extra_price_per_person Decimal?          @db.Decimal(10, 2)
+  base_member_count      Int           @default(10) // ✅ base สำหรับ 10 คนแรก
+  extra_price_per_person Decimal?      @db.Decimal(10, 2)
 
-  // details text
-  includes_left          String?           @db.Text
-  includes_right         String?           @db.Text
+  status                 PackageStatus @default(active)
 
-  created_at             DateTime          @default(now())
-  updated_at             DateTime          @default(now()) @updatedAt
+  // ✅ timeslots ของ package (มีได้แค่เช้า/บ่าย)
+  timeslots              PackageTimeSlot[]
 
   bookings               Booking[]
-  joinTrips              JoinTrip[]
+
+  created_at             DateTime      @default(now())
+  updated_at             DateTime      @default(now()) @updatedAt
+
+  @@index([boat_id])
+  @@index([status])
+  @@index([type])
 }
 
-
-
-// ----------- JOIN TRIP (for JOIN packages) ----------------
-
-model JoinTrip {
-  join_trip_id      Int              @id @default(autoincrement())
-  package_id        Int
-  boat_id           Int
-  trip_date         DateTime
-  time_slot         String           @db.VarChar(50)
-  price_per_person  Decimal          @db.Decimal(10, 2)
-  max_seats         Int
-  status            JoinTripStatus   @default(open)
-
-  package           Package          @relation(fields: [package_id], references: [package_id])
-  boat              Boat             @relation(fields: [boat_id], references: [boat_id])
-  bookings          Booking[]
-
-  created_at        DateTime         @default(now())
-  updated_at        DateTime         @default(now()) @updatedAt
-
-  @@map("join_trip")
-}
-
-
-
-// ----------- BOOKING (Private + Join) ----------------
-
-model Booking {
-  booking_id    Int            @id @default(autoincrement())
-  user_id       Int
+// ----------- PACKAGE TIME SLOT ----------------
+// จำกัดให้มีแค่ morning / afternoon ด้วย enum TimeSlot
+model PackageTimeSlot {
+  timeslot_id   Int            @id @default(autoincrement())
   package_id    Int
 
-  // สำหรับ Join Group -> อ้างรอบ
-  join_trip_id  Int?
+  slot          TimeSlot       // ✅ morning | afternoon
+  max_capacity  Int?           // จำกัดจำนวนคนต่อรอบ (แนะนำสำหรับ join)
+  status        TimeSlotStatus @default(active)
 
-  // สำหรับ Private Trip -> อ้างเรือโดยตรง
-  boat_id       Int?
-
-  trip_date     DateTime
-  time_slot     String         @db.VarChar(50)
-  people        Int
-  total_price   Decimal        @db.Decimal(10, 2)
-  status        BookingStatus  @default(pending)
+  package       Package        @relation(fields: [package_id], references: [package_id])
+  bookings      Booking[]
 
   created_at    DateTime       @default(now())
   updated_at    DateTime       @default(now()) @updatedAt
 
-  // relations
-  user          User           @relation(fields: [user_id], references: [user_id])
-  package       Package        @relation(fields: [package_id], references: [package_id])
-  joinTrip      JoinTrip?      @relation(fields: [join_trip_id], references: [join_trip_id])
-  boat          Boat?          @relation(fields: [boat_id], references: [boat_id])
-  passengers    Passenger[]
+  @@unique([package_id, slot]) // ✅ 1 package มีเช้าได้ 1 แถว บ่ายได้ 1 แถว
+  @@index([package_id])
+  @@index([status])
+}
+
+// ----------- BOOKING ----------------
+model Booking {
+  booking_id   Int           @id @default(autoincrement())
+  user_id      Int
+  package_id   Int
+  timeslot_id  Int           // ✅ อ้างถึงรอบ (morning/afternoon)
+
+  trip_date    DateTime
+  total_price  Decimal       @db.Decimal(10, 2)
+  status       BookingStatus @default(pending)
+
+  created_at   DateTime      @default(now())
+  updated_at   DateTime      @default(now()) @updatedAt
+
+  user         User          @relation(fields: [user_id], references: [user_id])
+  package      Package       @relation(fields: [package_id], references: [package_id])
+  timeslot     PackageTimeSlot @relation(fields: [timeslot_id], references: [timeslot_id])
+
+  passengers   Passenger[]
+
+  @@index([user_id])
+  @@index([package_id])
+  @@index([timeslot_id])
+  @@index([trip_date])
+  @@index([status])
+
+  // ✅ สำคัญมาก: ใช้ group join booking รอบเดียวกัน
+  @@index([package_id, trip_date, timeslot_id])
 
   @@map("booking")
 }
 
-
-
 // ----------- PASSENGER ----------------
-
 model Passenger {
-  passenger_id  Int       @id @default(autoincrement())
-  booking_id    Int
+  passenger_id Int      @id @default(autoincrement())
+  booking_id   Int
 
-  fname         String
-  lname         String
-  age           Int
-  gender        Gender
+  fname        String   @db.VarChar(60)
+  lname        String   @db.VarChar(60)
+  age          Int
+  gender       Gender
 
-  created_at    DateTime @default(now())
-  updated_at    DateTime @default(now()) @updatedAt
+  booking      Booking  @relation(fields: [booking_id], references: [booking_id], onDelete: Cascade)
 
-  booking       Booking   @relation(fields: [booking_id], references: [booking_id], onDelete: Cascade)
+  created_at   DateTime @default(now())
+  updated_at   DateTime @default(now()) @updatedAt
 
+  @@index([booking_id])
   @@map("passenger")
 }

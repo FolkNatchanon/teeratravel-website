@@ -1,15 +1,17 @@
+// app/(public)/login/page.tsx
 "use client";
 
 import Link from "next/link";
-import { useRouter } from "next/navigation";
+import { useRouter, useSearchParams } from "next/navigation";
 import React, { useRef, useState } from "react";
 
 export default function LoginPage() {
     const router = useRouter();
+    const searchParams = useSearchParams();
+    const nextPath = searchParams.get("next"); // เช่น /admin/...
 
     const [identifier, setIdentifier] = useState("");
     const [password, setPassword] = useState("");
-
     const [error, setError] = useState<string>("");
     const [isSubmitting, setIsSubmitting] = useState(false);
 
@@ -17,7 +19,6 @@ export default function LoginPage() {
 
     async function handleSubmit(e: React.FormEvent<HTMLFormElement>) {
         e.preventDefault();
-
         if (isSubmitting) return;
 
         setError("");
@@ -30,6 +31,7 @@ export default function LoginPage() {
             const res = await fetch("/api/auth/login", {
                 method: "POST",
                 headers: { "Content-Type": "application/json" },
+                credentials: "include",
                 signal: abortRef.current.signal,
                 body: JSON.stringify({ identifier, password }),
             });
@@ -41,19 +43,18 @@ export default function LoginPage() {
                 return;
             }
 
-            // สำคัญ: API set httpOnly cookie แล้ว
-            // เราแค่พาไปหน้าที่ถูก และ refresh ให้ server components อ่าน cookie ใหม่
-            if (data?.role === "A") {
-                router.replace("/admin");
+            // ✅ เลือกปลายทาง "ครั้งเดียว"
+            const target = nextPath ? nextPath : data?.role === "A" ? "/admin" : "/";
+
+            // ✅ ไปหน้าปลายทางก่อน
+            router.replace(target);
+
+            // ✅ แล้วค่อย refresh เพื่อให้ Navbar/Server Components อ่าน cookie ใหม่
+            setTimeout(() => {
                 router.refresh();
-            } else {
-                router.replace("/");
-                router.refresh();
-            }
+            }, 0);
         } catch (err: any) {
-            if (err?.name !== "AbortError") {
-                setError("เกิดข้อผิดพลาดในการเชื่อมต่อ");
-            }
+            if (err?.name !== "AbortError") setError("เกิดข้อผิดพลาดในการเชื่อมต่อ");
         } finally {
             setIsSubmitting(false);
         }
@@ -78,7 +79,6 @@ export default function LoginPage() {
                             <input
                                 type="text"
                                 className={inputBase}
-                                placeholder="example@gmail.com หรือ yourusername"
                                 value={identifier}
                                 onChange={(e) => setIdentifier(e.target.value)}
                                 disabled={isSubmitting}
@@ -91,7 +91,6 @@ export default function LoginPage() {
                             <input
                                 type="password"
                                 className={inputBase}
-                                placeholder="••••••••"
                                 value={password}
                                 onChange={(e) => setPassword(e.target.value)}
                                 disabled={isSubmitting}
@@ -113,15 +112,16 @@ export default function LoginPage() {
                             {isSubmitting ? "Logging in..." : "Login"}
                         </button>
                     </form>
+                    <div className="flex items-center justify-center mt-4 gap-3">
+                        <div className="text-center text-slate-600">
+                            ยังไม่มีบัญขีใช่ไหม?
+                        </div>
 
-                    <div className="mt-6 flex items-center justify-between text-sm">
-                        <Link href="/register" className="text-sky-600 font-medium hover:underline">
-                            สมัครสมาชิก
-                        </Link>
-
-                        <Link href="/" className="text-slate-600 hover:underline">
-                            กลับหน้าแรก
-                        </Link>
+                        <div className="flex items-center justify-center text-sm">
+                            <Link href="/register" className="text-sky-600 font-medium hover:underline">
+                                สมัครสมาชิก
+                            </Link>
+                        </div>
                     </div>
                 </div>
 

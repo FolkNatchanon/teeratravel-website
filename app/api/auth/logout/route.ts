@@ -1,10 +1,11 @@
 import { NextResponse } from "next/server";
-import { cookies } from "next/headers";
+
+export const runtime = "nodejs";
 
 export async function POST() {
-    const cookieStore = await cookies();
+    const res = NextResponse.json({ ok: true });
 
-    cookieStore.set("teera_user", "", {
+    res.cookies.set("teera_user", "", {
         httpOnly: true,
         sameSite: "lax",
         secure: process.env.NODE_ENV === "production",
@@ -12,5 +13,5 @@ export async function POST() {
         maxAge: 0,
     });
 
-    return NextResponse.json({ message: "ออกจากระบบแล้ว" });
+    return res;
 }

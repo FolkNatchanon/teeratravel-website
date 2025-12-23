@@ -1,111 +1,89 @@
-// app/api/auth/register/route.ts
 import { NextResponse } from "next/server";
 import { prisma } from "@/app/lib/prisma";
-import { cookies } from "next/headers";
+
+export const runtime = "nodejs";
+
+function isEmail(value: string) {
+    return /^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(value);
+}
 
 export async function POST(request: Request) {
     try {
-        const body = await request.json();
-        const {
-            username,
-            email,
-            user_fname,
-            user_lname,
-            password,
-            phone_number,
-        } = body;
+        const body = await request.json().catch(() => null);
 
-        // 1) เช็คกรอกครบไหม
-        if (
-            !username ||
-            !email ||
-            !user_fname ||
-            !user_lname ||
-            !password ||
-            !phone_number
-        ) {
-            return NextResponse.json(
-                { message: "กรอกข้อมูลให้ครบทุกช่อง" },
-                { status: 400 }
-            );
+        const username = body?.username?.toString()?.trim();
+        const user_fname = body?.user_fname?.toString()?.trim();
+        const user_lname = body?.user_lname?.toString()?.trim();
+        const email = body?.email?.toString()?.trim()?.toLowerCase();
+        const phone_number = body?.phone_number?.toString()?.trim();
+        const password = body?.password?.toString();
+
+        if (!username || !user_fname || !user_lname || !email || !phone_number || !password) {
+            return NextResponse.json({ message: "กรุณากรอกข้อมูลให้ครบ" }, { status: 400 });
         }
 
-        // เช็คความยาว (กันหลุดจากข้อจำกัด column)
-        if (username.length > 30) {
-            return NextResponse.json(
-                { message: "ชื่อผู้ใช้ต้องไม่เกิน 30 ตัวอักษร" },
-                { status: 400 }
-            );
+        if (!isEmail(email)) {
+            return NextResponse.json({ message: "อีเมลไม่ถูกต้อง" }, { status: 400 });
         }
-        if (email.length > 30) {
-            return NextResponse.json(
-                { message: "อีเมลต้องไม่เกิน 30 ตัวอักษร" },
-                { status: 400 }
-            );
-        }
-        if (password.length > 20) {
-            return NextResponse.json(
-                { message: "รหัสผ่านต้องไม่เกิน 20 ตัวอักษร" },
-                { status: 400 }
-            );
-        }
+
         if (phone_number.length !== 10) {
-            return NextResponse.json(
-                { message: "กรุณากรอกเบอร์โทร 10 หลัก" },
-                { status: 400 }
-            );
+            return NextResponse.json({ message: "เบอร์โทรต้องมี 10 หลัก" }, { status: 400 });
         }
 
-        // 2) เช็คว่ามี username หรือ email ซ้ำไหม
-        const existing = await prisma.user.findFirst({
-            where: {
-                OR: [{ username }, { email }],
-            },
+        if (password.length < 6) {
+            return NextResponse.json({ message: "รหัสผ่านต้องยาวอย่างน้อย 6 ตัว" }, { status: 400 });
+        }
+
+        const exists = await prisma.user.findFirst({
+            where: { OR: [{ email }, { username }] },
+            select: { user_id: true },
         });
 
-        if (existing) {
+        if (exists) {
             return NextResponse.json(
-                { message: "ชื่อผู้ใช้หรืออีเมลนี้ถูกใช้แล้ว" },
+                { message: "มีผู้ใช้นี้อยู่แล้ว (username หรือ email ซ้ำ)" },
                 { status: 409 }
             );
         }
 
-        // 3) สร้าง user ใหม่ (role = U เสมอ)
-        const newUser = await prisma.user.create({
+        const user = await prisma.user.create({
             data: {
                 username,
                 user_fname,
                 user_lname,
                 email,
-                role: "U",
-                password, // ถ้าจะ hash ทีหลังค่อยมาปรับตรงนี้
                 phone_number,
+                password, // ✅ ตอนนี้เก็บ plain-text ให้ตรงกับ login เดิม
+                role: "U", // ✅ user ปกติ
+            },
+            select: {
+                user_id: true,
+                username: true,
+                email: true,
+                role: true,
             },
         });
 
-        // 4) set cookie login ทันที (เหมือนตอน login)
+        // ✅ optional: set cookie ให้ login เลยหลัง register
         const payload = JSON.stringify({
-            user_id: newUser.user_id,
-            username: newUser.username,
-            role: newUser.role,
+            user_id: user.user_id,
+            username: user.username,
+            role: user.role,
         });
 
-        const cookieStore = await cookies();
-        cookieStore.set("teera_user", payload, {
+        const res = NextResponse.json({ ok: true, user }, { status: 201 });
+
+        res.cookies.set("teera_user", payload, {
             httpOnly: true,
             sameSite: "lax",
             secure: process.env.NODE_ENV === "production",
             path: "/",
-            maxAge: 60 * 60 * 24 * 7, // 7 วัน
+            maxAge: 60 * 60 * 24 * 7,
         });
 
-        // สมัครเสร็จ → เด้งกลับหน้าแรก
-        return NextResponse.redirect(new URL("/", request.url));
+        return res;
     } catch (error) {
         console.error("Register error:", error);
-        return NextResponse.json(
-            { message: "เกิดข้อผิดพลาดในระบบ" },
-            { status: 500 }
-        );
+        return NextResponse.json({ message: "เกิดข้อผิดพลาดในระบบ" }, { status: 500 });
     }
 }
